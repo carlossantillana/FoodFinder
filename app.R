@@ -11,34 +11,43 @@ library(reshape)
 library("crul")
 register_google(Sys.getenv("google"))
 # Define UI ----
-ui <- fluidPage(
-
-  
-  sidebarLayout(position = "right",
-                sidebarPanel(
-                  textInput(inputId = "location",
-                            label = "City to search:",
-                            value = "Chino"),
-                  textInput(inputId = "type",
-                            label = "Type Of Food:",
-                            value = "mexican"),
-                  sliderInput("zoom", h3("Zoom"),
-                              min = 1, max = 20, value = 12),
-                  submitButton("Submit")
-                  
-                ),
-                mainPanel(
-                  plotOutput(outputId = "map",
-                             width = "100%",
-                             height = "100vh",
-                             click = FALSE)
-                )
-  )
+ui <- fluidPage(theme = "styles.css",
+    plotOutput(outputId = "map",
+               width = "100vw",
+               height = "100vh"),
+    actionButton("search", "Search")
 )
 
 # Define server logic ----
 server <- function(input, output) {
-  
+  first <- reactiveVal(TRUE)
+  mapLon <- reactiveVal(NULL)
+  mapLat <- reactiveVal(NULL)
+  observeEvent(input$search, {
+    showModal(modalDialog(
+      title = "Food Finder",
+      textInput(inputId = "location",
+                label = "City to search:",
+                value = "Chino"),
+      textInput(inputId = "type",
+                label = "Type Of Food:",
+                value = "mexican"),
+      sliderInput("zoom", h3("Zoom"),
+                  min = 9, max = 15, value = 12),
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("ok", "OK")
+      )
+    ))
+  })
+  # When OK button is pressed, attempt to load the data set. If successful,
+  # remove the modal. If not show another modal, but this time with a failure
+  # message.
+  observeEvent(input$ok, {
+    first(FALSE)
+      removeModal()
+  })
   reactiveQuery <- reactive({
     numQueries <- 4
     foodType <- input$type
@@ -65,15 +74,36 @@ server <- function(input, output) {
     businessWeighted <- with(foodDF, foodDF[rep(1:nrow(foodDF), businesses.rating*50),])
   })
   
+  
   reactiveMap <- reactive({
-    queryData <- reactiveQuery()
-    get_map(location = c(lon = queryData$region.center.longitude[1], lat = queryData$region.center.latitude[1]), source = "google", maptype = "roadmap", zoom = input$zoom)
+    if (first()){
+      get_map(location = c(lon = -118.243683, lat = 34.052235), source = "google", maptype = "roadmap", zoom = 12)
+    } else {
+      print(mapLon)
+      print(mapLat)
+      get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
+    }
   })
   
   output$map <- renderPlot({
+    print(first())
+    if (first()){
+      ggmap(reactiveMap(), extent = "device") +
+        theme(axis.line = element_blank(),
+              axis.text = element_blank(),
+              axis.ticks = element_blank(),
+              plot.margin = unit(c(0, 0, -1, -1), 'lines')) +
+        xlab('') +
+        ylab('')
+    }
+    else {
     YlOrBr <- c("#FFFFD4", "#FED98E", "#FE9929", "#D95F0E", "#993404")
     queryData <- reactiveQuery()
-    ggmap(reactiveMap(), extent = "panel") +
+    mapLon(queryData$region.center.longitude[1])
+    mapLat(queryData$region.center.latitude[1])
+    print(mapLon)
+    print(mapLat)
+    ggmap(reactiveMap(), extent = "device") +
       theme(axis.line = element_blank(),
             axis.text = element_blank(),
             axis.ticks = element_blank(),
@@ -84,7 +114,8 @@ server <- function(input, output) {
                      geom = "polygon", size = 0.01, bins = 50,show.legend = FALSE) +
       scale_fill_gradient(low = "green", high = "red") +
       scale_alpha(range = c(0, 0.3), guide = FALSE)
-  })
+    }
+  },             bg="transparent")
 }
 
 # Run the app ----
