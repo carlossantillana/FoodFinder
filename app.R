@@ -8,14 +8,35 @@ library(jsonlite)
 library(httr)
 library(tidyr)
 library(reshape)
+library(shinythemes)
 library("crul")
 register_google(Sys.getenv("google"))
 # Define UI ----
-ui <- fluidPage(theme = "styles.css",
-    plotOutput(outputId = "map",
-               width = "100vw",
-               height = "100vh"),
-    actionButton("search", "Search")
+ui <- navbarPage("Food Finder",
+   tabPanel(textInput(inputId = "location",
+             label = "City to search:",
+             value = "Los Angeles")
+   ),
+   
+   tabPanel(textInput(inputId = "type",
+             label = "Type Of Food:",
+             value = "")
+   ),
+   
+   tabPanel(
+   sliderInput("zoom", "Zoom:",
+               min = 9, max = 15, value = 12)
+   ),
+   
+   tabPanel(actionButton("search", "Search")),
+   
+   theme = shinytheme("cerulean"),
+   
+   tags$head(
+     tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
+   ),
+    mainPanel(plotOutput(outputId = "map", height = "80vh")),
+    collapsible = FALSE
 )
 
 # Define server logic ----
@@ -23,32 +44,12 @@ server <- function(input, output) {
   first <- reactiveVal(TRUE)
   mapLon <- reactiveVal(NULL)
   mapLat <- reactiveVal(NULL)
+
   observeEvent(input$search, {
-    showModal(modalDialog(
-      title = "Food Finder",
-      textInput(inputId = "location",
-                label = "City to search:",
-                value = "Chino"),
-      textInput(inputId = "type",
-                label = "Type Of Food:",
-                value = "mexican"),
-      sliderInput("zoom", h3("Zoom"),
-                  min = 9, max = 15, value = 12),
-      easyClose = TRUE,
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("ok", "OK")
-      )
-    ))
-  })
-  # When OK button is pressed, attempt to load the data set. If successful,
-  # remove the modal. If not show another modal, but this time with a failure
-  # message.
-  observeEvent(input$ok, {
     first(FALSE)
-      removeModal()
   })
-  reactiveQuery <- reactive({
+
+  reactiveQuery <- eventReactive(input$search, {
     numQueries <- 4
     foodType <- input$type
     foodLocation <- input$location
@@ -75,20 +76,14 @@ server <- function(input, output) {
   })
   
   
-  reactiveMap <- reactive({
-    if (first()){
-      get_map(location = c(lon = -118.243683, lat = 34.052235), source = "google", maptype = "roadmap", zoom = 12)
-    } else {
-      print(mapLon)
-      print(mapLat)
-      get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
-    }
+  reactiveMap <- eventReactive(input$search, {
+    get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
   })
   
   output$map <- renderPlot({
-    print(first())
     if (first()){
-      ggmap(reactiveMap(), extent = "device") +
+      map <- get_map(location = c(lon = -118.243683, lat = 34.052235), source = "google", maptype = "roadmap", zoom = 12)
+      ggmap(map, extent = "device") +
         theme(axis.line = element_blank(),
               axis.text = element_blank(),
               axis.ticks = element_blank(),
@@ -101,8 +96,6 @@ server <- function(input, output) {
     queryData <- reactiveQuery()
     mapLon(queryData$region.center.longitude[1])
     mapLat(queryData$region.center.latitude[1])
-    print(mapLon)
-    print(mapLat)
     ggmap(reactiveMap(), extent = "device") +
       theme(axis.line = element_blank(),
             axis.text = element_blank(),
@@ -115,7 +108,8 @@ server <- function(input, output) {
       scale_fill_gradient(low = "green", high = "red") +
       scale_alpha(range = c(0, 0.3), guide = FALSE)
     }
-  },             bg="transparent")
+  },
+  bg="transparent")
 }
 
 # Run the app ----
