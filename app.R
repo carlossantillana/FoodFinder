@@ -48,30 +48,49 @@ server <- function(input, output) {
   observeEvent(input$search, {
     first(FALSE)
   })
-
   reactiveQuery <- eventReactive(input$search, {
-    numQueries <- 4
-    foodType <- input$type
-    foodLocation <- input$location
+    location <- geocode(input$location, output = "latlon")
+    mapLon(location$lon)
+    mapLat(location$lat)
+    map <- get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
+    mapAt <- attr(map, 'bb')
+    mapbb <- list("city"= "Los Angeles", 
+                  "lowerLeft" = c(mapAt$ll.lat, mapAt$ll.lon), "lowerRight"=c(mapAt$ll.lat, mapAt$ur.lon), "upperLeft" =c(mapAt$ur.lat, mapAt$ll.lon), "upperRight"=c(mapAt$ur.lat, mapAt$ur.lon))
+    cols <- seq(mapbb$lowerLeft[2], mapbb$lowerRight[2], length.out = 3)
+    rows <- seq(mapbb$lowerLeft[1], mapbb$upperRight[1], length.out = 3)
+    mapGrid <- expand.grid(x = cols, y = rows)
+    numQueries <- 9
+    foodType <- "mexican"
     offset <- 0;
     crul_settings(TRUE)
     set_headers(`Authorization` = Sys.getenv("yelp"))
-    url <- sapply(1:numQueries, function(x) paste0("https://api.yelp.com/v3/businesses/search?term=",foodType ,"&location=", foodLocation ,"&limit=50&offset=", (x-1)*50))
+    url <- sapply(1:numQueries, function(x) paste0("https://api.yelp.com/v3/businesses/search?term=", input$type ,"&latitude=", mapGrid$y[x] ,"&longitude=", mapGrid$x[x],"&limit=50&radius=6437&sort_by=rating"))
     url <- sapply (1:numQueries, function (x) URLencode(url[x]))
     (cc <- Async$new(
       urls = c(
         url[1],
         url[2],
         url[3],
-        url[4]
+        url[4],
+        url[5],
+        url[6],
+        url[7],
+        url[8],
+        url[9]
       )))
     res <- cc$get()
-  
+    
     cleanResp <- as.data.frame(fromJSON(res[[1]]$parse("UTF-8"), flatten = TRUE))
     cleanResp2 <- as.data.frame(fromJSON(res[[2]]$parse("UTF-8"), flatten = TRUE))
     cleanResp3 <- as.data.frame(fromJSON(res[[3]]$parse("UTF-8"), flatten = TRUE))
     cleanResp4 <- as.data.frame(fromJSON(res[[4]]$parse("UTF-8"), flatten = TRUE))
-    foodDF <- rbind(cleanResp, cleanResp2, cleanResp3, cleanResp4)
+    cleanResp5 <- as.data.frame(fromJSON(res[[5]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp6 <- as.data.frame(fromJSON(res[[6]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp7 <- as.data.frame(fromJSON(res[[7]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp8 <- as.data.frame(fromJSON(res[[8]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp9 <- as.data.frame(fromJSON(res[[9]]$parse("UTF-8"), flatten = TRUE))
+    foodDF <- rbind(cleanResp, cleanResp2, cleanResp3, cleanResp4, cleanResp5, cleanResp6, cleanResp7, cleanResp8, cleanResp9)
+    foodDF %>% distinct(businesses.location.address1, .keep_all = TRUE)
     businessWeighted <- with(foodDF, foodDF[rep(1:nrow(foodDF), businesses.rating*50),])
   })
   
@@ -79,7 +98,7 @@ server <- function(input, output) {
   reactiveMap <- eventReactive(input$search, {
     get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
   })
-  
+
   output$map <- renderPlot({
     if (first()){
       map <- get_map(location = c(lon = -118.243683, lat = 34.052235), source = "google", maptype = "roadmap", zoom = 12)
@@ -92,10 +111,8 @@ server <- function(input, output) {
         ylab('')
     }
     else {
-    YlOrBr <- c("#FFFFD4", "#FED98E", "#FE9929", "#D95F0E", "#993404")
+
     queryData <- reactiveQuery()
-    mapLon(queryData$region.center.longitude[1])
-    mapLat(queryData$region.center.latitude[1])
     ggmap(reactiveMap(), extent = "device") +
       theme(axis.line = element_blank(),
             axis.text = element_blank(),
@@ -105,7 +122,7 @@ server <- function(input, output) {
       ylab('') +
       stat_density2d(data = queryData, aes(x = businesses.coordinates.longitude, y = businesses.coordinates.latitude, fill = ..level.., alpha = ..level..),
                      geom = "polygon", size = 0.01, bins = 50,show.legend = FALSE) +
-      scale_fill_gradient(low = "green", high = "red") +
+      scale_fill_gradient(low = "yellow", high = "red") +
       scale_alpha(range = c(0, 0.3), guide = FALSE)
     }
   },

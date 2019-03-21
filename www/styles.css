@@ -11,13 +11,10 @@ body {
     right: 0;
     margin: auto
   }
-
-  #search{
-
-  }
   
   ul li:nth-child(4) {
     position: relative;
     top: 50%;
     transform: translateY(50%);
+  }
 }
