@@ -56,40 +56,37 @@ server <- function(input, output) {
     mapAt <- attr(map, 'bb')
     mapbb <- list("city"= "Los Angeles", 
                   "lowerLeft" = c(mapAt$ll.lat, mapAt$ll.lon), "lowerRight"=c(mapAt$ll.lat, mapAt$ur.lon), "upperLeft" =c(mapAt$ur.lat, mapAt$ll.lon), "upperRight"=c(mapAt$ur.lat, mapAt$ur.lon))
-    cols <- seq(mapbb$lowerLeft[2], mapbb$lowerRight[2], length.out = 3)
-    rows <- seq(mapbb$lowerLeft[1], mapbb$upperRight[1], length.out = 3)
+    mapbb
+    cols <- seq(mapbb$lowerLeft[2], mapbb$lowerRight[2], length.out = 2)
+    rows <- seq(mapbb$lowerLeft[1], mapbb$upperRight[1], length.out = 2)
     mapGrid <- expand.grid(x = cols, y = rows)
-    numQueries <- 9
+    numQueries <- 4
     foodType <- "mexican"
     offset <- 0;
     crul_settings(TRUE)
     set_headers(`Authorization` = Sys.getenv("yelp"))
-    url <- sapply(1:numQueries, function(x) paste0("https://api.yelp.com/v3/businesses/search?term=", input$type ,"&latitude=", mapGrid$y[x] ,"&longitude=", mapGrid$x[x],"&limit=50&radius=6437&sort_by=rating"))
+    sapply(1:numQueries, function(x) print(paste0("latitude=", mapGrid$y[x] ,"&longitude=", mapGrid$x[x])))
+    
+    url <- sapply(1:numQueries, function(x) paste0("https://api.yelp.com/v3/businesses/search?term=", input$type ,"&latitude=", mapGrid$y[x] ,"&longitude=", mapGrid$x[x],"&limit=50&radius=8046&sort_by=rating"))
     url <- sapply (1:numQueries, function (x) URLencode(url[x]))
     (cc <- Async$new(
       urls = c(
-        url[1],
         url[2],
-        url[3],
         url[4],
         url[5],
         url[6],
-        url[7],
-        url[8],
-        url[9]
+        url[8]
       )))
     res <- cc$get()
     
-    cleanResp <- as.data.frame(fromJSON(res[[1]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp2 <- as.data.frame(fromJSON(res[[2]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp3 <- as.data.frame(fromJSON(res[[3]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp4 <- as.data.frame(fromJSON(res[[4]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp5 <- as.data.frame(fromJSON(res[[5]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp6 <- as.data.frame(fromJSON(res[[6]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp7 <- as.data.frame(fromJSON(res[[7]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp8 <- as.data.frame(fromJSON(res[[8]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp9 <- as.data.frame(fromJSON(res[[9]]$parse("UTF-8"), flatten = TRUE))
-    foodDF <- rbind(cleanResp, cleanResp2, cleanResp3, cleanResp4, cleanResp5, cleanResp6, cleanResp7, cleanResp8, cleanResp9)
+    
+    cleanResp <- as.data.frame(fromJSON(res[[2]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp2 <- as.data.frame(fromJSON(res[[4]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp3 <- as.data.frame(fromJSON(res[[5]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp4 <- as.data.frame(fromJSON(res[[6]]$parse("UTF-8"), flatten = TRUE))
+    cleanResp5 <- as.data.frame(fromJSON(res[[8]]$parse("UTF-8"), flatten = TRUE))
+    
+    foodDF <- rbind(cleanResp, cleanResp2, cleanResp3, cleanResp4, cleanResp5)
     foodDF %>% distinct(businesses.location.address1, .keep_all = TRUE)
     businessWeighted <- with(foodDF, foodDF[rep(1:nrow(foodDF), businesses.rating*50),])
   })
@@ -113,7 +110,7 @@ server <- function(input, output) {
     else {
 
     queryData <- reactiveQuery()
-    ggmap(reactiveMap(), extent = "device") +
+    ggmap(reactiveMap(), extent = "normal") +
       theme(axis.line = element_blank(),
             axis.text = element_blank(),
             axis.ticks = element_blank(),
