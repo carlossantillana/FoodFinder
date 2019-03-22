@@ -50,6 +50,7 @@ server <- function(input, output) {
   })
   reactiveQuery <- eventReactive(input$search, {
     location <- geocode(input$location, output = "latlon")
+    cat(file=stderr(), toString(location), "\n")
     mapLon(location$lon)
     mapLat(location$lat)
     map <- get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
@@ -78,6 +79,9 @@ server <- function(input, output) {
       )))
     res <- cc$get()
 
+    shiny::validate(
+      need(fromJSON(res[[1]]$parse("UTF-8"))$total != 0, "Please a valid city or food")
+    )
     cleanResp <- as.data.frame(fromJSON(res[[1]]$parse("UTF-8"), flatten = TRUE))
     cleanResp2 <- as.data.frame(fromJSON(res[[2]]$parse("UTF-8"), flatten = TRUE))
     cleanResp3 <- as.data.frame(fromJSON(res[[3]]$parse("UTF-8"), flatten = TRUE))  
