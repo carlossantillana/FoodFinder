@@ -17,25 +17,30 @@ ui <- navbarPage("Food Finder",
              label = "City to search:",
              value = "Los Angeles")
    ),
-   
+
    tabPanel(textInput(inputId = "type",
              label = "Type Of Food:",
              value = "")
    ),
-   
+
    tabPanel(
    sliderInput("zoom", "Zoom:",
-               min = 9, max = 15, value = 12)
+               min = 12, max = 15, value = 12)
    ),
-   
+
    tabPanel(actionButton("search", "Search")),
-   
+
    theme = shinytheme("cerulean"),
-   
+
    tags$head(
      tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
    ),
     mainPanel(plotOutput(outputId = "map", height = "80vh")),
+   sidebarPanel(
+     # my_output_text comes from the server
+     uiOutput("restarauntList")
+    #we need name review_count, rating, price, location, distance?
+   ),
     collapsible = FALSE
 )
 
@@ -55,7 +60,7 @@ server <- function(input, output) {
     mapLat(location$lat)
     map <- get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
     mapAt <- attr(map, 'bb')
-    mapbb <- list("city"= "Los Angeles", 
+    mapbb <- list("city"= "Los Angeles",
                   "lowerLeft" = c(mapAt$ll.lat, mapAt$ll.lon), "lowerRight"=c(mapAt$ll.lat, mapAt$ur.lon), "upperLeft" =c(mapAt$ur.lat, mapAt$ll.lon), "upperRight"=c(mapAt$ur.lat, mapAt$ur.lon))
     mapbb
     cols <- seq(mapbb$lowerLeft[2], mapbb$lowerRight[2], length.out = 3)
@@ -66,7 +71,7 @@ server <- function(input, output) {
     offset <- 0;
     crul_settings(TRUE)
     set_headers(`Authorization` = Sys.getenv("yelp"))
-    
+
     url <- sapply(1:numQueries, function(x) paste0("https://api.yelp.com/v3/businesses/search?term=", input$type ,"&latitude=", mapGrid$y[x] ,"&longitude=", mapGrid$x[x],"&limit=50&radius=4828&sort_by=rating"))
     url <- sapply (1:numQueries, function (x) URLencode(url[x]))
     (cc <- Async$new(
@@ -80,20 +85,29 @@ server <- function(input, output) {
     res <- cc$get()
 
     shiny::validate(
-      need(fromJSON(res[[1]]$parse("UTF-8"))$total != 0, "Please a valid city or food")
+      need(fromJSON(res[[1]]$parse("UTF-8"))$total != 0, "Please enter a valid city or food")
     )
     cleanResp <- as.data.frame(fromJSON(res[[1]]$parse("UTF-8"), flatten = TRUE))
     cleanResp2 <- as.data.frame(fromJSON(res[[2]]$parse("UTF-8"), flatten = TRUE))
-    cleanResp3 <- as.data.frame(fromJSON(res[[3]]$parse("UTF-8"), flatten = TRUE))  
+    cleanResp3 <- as.data.frame(fromJSON(res[[3]]$parse("UTF-8"), flatten = TRUE))
     cleanResp4 <- as.data.frame(fromJSON(res[[4]]$parse("UTF-8"), flatten = TRUE))
     cleanResp5 <- as.data.frame(fromJSON(res[[5]]$parse("UTF-8"), flatten = TRUE))
 
     foodDF <- rbind(cleanResp, cleanResp2, cleanResp3, cleanResp4, cleanResp5)
     foodDF <- foodDF %>% distinct(businesses.location.address1, .keep_all = TRUE)
     foodDF <- foodDF %>% filter((abs(businesses.coordinates.latitude) >= abs(mapbb$lowerRight[1])) & (abs(businesses.coordinates.latitude) <= abs(mapbb$upperLeft[1])) & ( abs(businesses.coordinates.longitude) >= abs(mapbb$lowerRight[2])) & (abs(businesses.coordinates.longitude) <= abs(mapbb$lowerLeft[2])) )
+    #Output text
+    output$restarauntList <- renderUI({
+      tagList(
+        tags$div(`class` = "title", "Restaurants:"),
+        tags$div(`class` = "vertical-menu",
+            lapply(1:nrow(foodDF), function(x) tags$a(href=foodDF$businesses.url[x], target="_blank", tags$div(`class` = "entry-container",tags$div(`class` = "entry-name",foodDF$businesses.name[x]), tags$div(`class` = "entry-rating"," rating: ", foodDF$businesses.rating[x]), tags$div(`class` = "entry-review-count"," review count: ", foodDF$businesses.review_count[x]), tags$div(`class` = "entry-price"," price: ", foodDF$businesses.price[x]), tags$div(`class` = "entry-distance"," distance: ", round(foodDF$businesses.distance[x]/1609, digits = 1), "mi"))))
+        )
+      )
+    })
     businessWeighted <- with(foodDF, foodDF[rep(1:nrow(foodDF), businesses.rating*50),])
-  })  
-  
+  })
+
   reactiveMap <- eventReactive(input$search, {
     get_map(location = c(lon = mapLon(), lat = mapLat()), source = "google", maptype = "roadmap", zoom = input$zoom)
   })

@@ -8,18 +8,40 @@ body {
   color: black;
 }
 
+.col-sm-4 {
+    overflow-y: scroll;
+    max-height: 80vh;
+}
+.vertical-menu a {
+  background-color: #eee; /* Grey background color */
+  color: black; /* Black text color */
+  display: block; /* Make the links appear below each other */
+  padding: 12px; /* Add some padding */
+  text-decoration: none; /* Remove underline from links */
+}
+
+.vertical-menu a:hover {
+  background-color: #ccc; /* Dark grey background on mouse-over */
+}
+
+.vertical-menu a.active {
+  background-color: #4CAF50; /* Add a green color to the "active/current" link */
+  color: white;
+}
+
+.title {
+  font-size: 1.3em;
+  text-align: center;
+  color: black;
+  padding-bottom: 1em;
+}
+
 @media only screen and (min-width: 768px) {
-  
   .col-sm-8 {
-    position: absolute;
+    position: relative;
     left: 0;
     right: 0;
     margin: auto
   }
-  
-  ul li:nth-child(4) {
-    position: relative;
-    top: 50%;
-    transform: translateY(50%);
-  }
+
 }
