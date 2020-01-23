@@ -81,6 +81,7 @@ server <- function(input, output) {
         url[5],
         url[6],
         url[8]
+      ), headers = c(Authorization =  Sys.getenv("yelp")
       )))
     res <- cc$get()
 
